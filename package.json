@@ -1,4 +1,5 @@
 {
+  "type": "module",
   "name": "aied-node-server-app",
   "version": "1.0.0",
   "description": "",
