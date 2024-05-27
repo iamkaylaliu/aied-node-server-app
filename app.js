@@ -3,6 +3,7 @@ import cors from 'cors';
 import 'dotenv/config';
 import OpenAI from 'openai';
 import dotenv from 'dotenv';
+import session from "express-session";
 
 // Load environment variables from .env file
 dotenv.config();
@@ -11,7 +12,27 @@ dotenv.config();
 const app = express();
 
 // Use CORS middleware
-app.use(cors());
+// app.use(cors());
+app.use(
+    cors({
+        credentials: true,
+        origin: process.env.FRONTEND_URL
+    })
+);
+
+const sessionOptions = {
+    secret: "any string",
+    resave: false,
+    saveUninitialized: false,
+};
+if (process.env.NODE_ENV !== "development") {
+    sessionOptions.proxy = true;
+    sessionOptions.cookie = {
+        sameSite: "none",
+        secure: true,
+    };
+}
+app.use(session(sessionOptions));
 
 // Use JSON parsing middleware
 app.use(express.json());
