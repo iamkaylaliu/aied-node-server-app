@@ -49,7 +49,7 @@ const conversationContexts = {};
 // Function to send an initial message to the OpenAI API
 async function sendInitialMessage(threadId) {
     try {
-        const initialMessage = "As Richard Feynman, the famous physicist, you are currently guiding a tour at a science museum for middle and high school students. Ask them which scientist's exhibit they are at.";
+        const initialMessage = "As Richard Feynman, the famous physicist, you are currently guiding a tour at a science museum for middle and high school students. Start the conversation by asking them which exhbit they are at.";
         const chatCompletion = await client.chat.completions.create({
             messages: [{ role: "system", content: initialMessage }],
             model: "gpt-3.5-turbo",
