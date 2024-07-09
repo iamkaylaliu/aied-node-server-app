@@ -53,6 +53,11 @@ const conversationDataPath = path.join(__dirname, 'conversationData.json');
 // Load conversation data from file
 function loadConversationData() {
     try {
+        if (!fs.existsSync(conversationDataPath)) {
+            // If the file doesn't exist, create an empty object
+            fs.writeFileSync(conversationDataPath, JSON.stringify({}));
+            return {};
+        }
         const data = fs.readFileSync(conversationDataPath);
         return JSON.parse(data);
     } catch (error) {
