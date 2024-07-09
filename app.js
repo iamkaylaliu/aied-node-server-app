@@ -4,6 +4,10 @@ import 'dotenv/config';
 import OpenAI from 'openai';
 import dotenv from 'dotenv';
 import session from "express-session";
+import fs from 'fs';
+import path from 'path';
+import { fileURLToPath } from 'url';
+import { dirname } from 'path';
 
 // Load environment variables from .env file
 dotenv.config();
@@ -12,7 +16,6 @@ dotenv.config();
 const app = express();
 
 // Use CORS middleware
-// app.use(cors());
 app.use(
     cors({
         credentials: true,
@@ -21,10 +24,12 @@ app.use(
     })
 );
 
+// Session setup
 const sessionOptions = {
     secret: "any string",
     resave: false,
     saveUninitialized: false,
+    cookie: {}
 };
 if (process.env.NODE_ENV !== "development") {
     sessionOptions.proxy = true;
@@ -43,52 +48,74 @@ const client = new OpenAI({
     apiKey: process.env.OPENAI_API_KEY,
 });
 
-// In-memory store for conversation contexts
-const conversationContexts = {};
+// Path to store conversation data
+// const conversationDataPath = path.join(__dirname, 'conversationData.json');
+const __filename = fileURLToPath(import.meta.url);
+const __dirname = dirname(__filename);
+const conversationDataPath = path.join(__dirname, 'conversationData.json');
+
+// Load conversation data from file
+function loadConversationData() {
+    if (!fs.existsSync(conversationDataPath)) {
+        return {};
+    }
+    const data = fs.readFileSync(conversationDataPath);
+    return JSON.parse(data);
+}
+
+// Save converstaion data to file
+function saveConversationData(data) {
+    fs.writeFileSync(conversationDataPath, JSON.stringify(data, null, 2));
+}
 
 // Function to send an initial message to the OpenAI API
-async function sendInitialMessage(threadId) {
-    try {
-        const initialMessage = "As Richard Feynman, the famous physicist, you are currently guiding a tour at a science museum for middle and high school students. Start the conversation by asking them which exhbit they are at.";
-        const chatCompletion = await client.chat.completions.create({
-            messages: [{ role: "system", content: initialMessage }],
-            model: "gpt-3.5-turbo",
-            // model: "gpt-4o",
-        });
+async function sendInitialMessage(sessionId) {
+    const initialMessage = "As Richard Feynman, the famous physicist, you are currently guiding a tour at a science museum for middle and high school students. Start the conversation by asking them which exhbit they are at.";
+    const chatCompletion = await client.chat.completions.create({
+        messages: [{ role: "system", content: initialMessage }],
+        model: "gpt-3.5-turbo",
+        // model: "gpt-4o",
+    });
 
-        // Store the initial context in memory
-        conversationContexts[threadId] = [{ role: "system", content: initialMessage }];
+    // Store the initial context in the data
+    const conversationData = loadConversationData();
+    conversationData[sessionId] = [{ role: "system", content: initialMessage }];
+    saveConversationData(conversationData);
 
-        console.log('Initial message sent to OpenAI:', chatCompletion);
-    } catch (error) {
-        console.error('Error sending initial message:', error);
-    }
+    return chatCompletion;
 }
 
 // Define your routes here
 app.post('/api/assistant/thread/message', async (req, res) => {
     try {
-        const { thread_id, content } = req.body;
-        console.log(`Received message for thread ${thread_id}: ${content}`);
+        const { content } = req.body;
+        const sessionId = req.sessionID;
+        console.log(`Received message for session ${sessionId}: ${content}`);
+
+        // Load conversation data
+        const conversationData = loadConversationData();
 
         // Initialize conversation if it doesn't exist
-        if (!conversationContexts[thread_id]) {
-            await sendInitialMessage(thread_id);
+        if (!conversationData[sessionId]) {
+            await sendInitialMessage(sessionId);
         }
 
         // Append user message to the context
-        conversationContexts[thread_id].push({ role: "user", content });
+        conversationData[sessionId].push({ role: "user", content });
 
         // Send the message using OpenAI's chat.completions.create method
         const chatCompletion = await client.chat.completions.create({
-            messages: conversationContexts[thread_id],
+            messages: conversationData[sessionId],
             model: "gpt-3.5-turbo",
             // model: "gpt-4o",
         });
 
         // Append assistant's response to the context
         const assistantMessage = chatCompletion.choices[0].message;
-        conversationContexts[thread_id].push(assistantMessage);
+        conversationData[sessionId].push(assistantMessage);
+
+        // Save conversation data
+        saveConversationData(conversationData);
 
         res.json({ choices: [{ message: assistantMessage }] });
     } catch (error) {
