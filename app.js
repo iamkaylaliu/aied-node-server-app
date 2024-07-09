@@ -112,6 +112,9 @@ app.post('/api/assistant/thread/message', async (req, res) => {
         }
 
         // Append user message to the context
+        if (!Array.isArray(conversationData[sessionId])) {
+            conversationData[sessionId] = []; // Initialize as an empty array if not already
+        }
         conversationData[sessionId].push({ role: "user", content });
 
         // Send the message using OpenAI's chat.completions.create method
@@ -133,6 +136,7 @@ app.post('/api/assistant/thread/message', async (req, res) => {
         res.status(500).json({ error: 'Failed to send message.' });
     }
 });
+
 
 // Start the server
 const PORT = process.env.PORT || 4000;
