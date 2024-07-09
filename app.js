@@ -16,13 +16,10 @@ dotenv.config();
 const app = express();
 
 // Use CORS middleware
-app.use(
-    cors({
-        credentials: true,
-        // origin: process.env.FRONTEND_URL
-        origin: 'https://unveilgenius.netlify.app',
-    })
-);
+app.use(cors({
+    credentials: true,
+    origin: 'https://unveilgenius.netlify.app',
+}));
 
 // Session setup
 const sessionOptions = {
@@ -49,40 +46,49 @@ const client = new OpenAI({
 });
 
 // Path to store conversation data
-// const conversationDataPath = path.join(__dirname, 'conversationData.json');
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = dirname(__filename);
 const conversationDataPath = path.join(__dirname, 'conversationData.json');
 
 // Load conversation data from file
 function loadConversationData() {
-    if (!fs.existsSync(conversationDataPath)) {
+    try {
+        const data = fs.readFileSync(conversationDataPath);
+        return JSON.parse(data);
+    } catch (error) {
+        console.error('Error loading conversation data:', error);
         return {};
     }
-    const data = fs.readFileSync(conversationDataPath);
-    return JSON.parse(data);
 }
 
-// Save converstaion data to file
+// Save conversation data to file
 function saveConversationData(data) {
-    fs.writeFileSync(conversationDataPath, JSON.stringify(data, null, 2));
+    try {
+        fs.writeFileSync(conversationDataPath, JSON.stringify(data, null, 2));
+    } catch (error) {
+        console.error('Error saving conversation data:', error);
+    }
 }
 
 // Function to send an initial message to the OpenAI API
 async function sendInitialMessage(sessionId) {
-    const initialMessage = "As Richard Feynman, the famous physicist, you are currently guiding a tour at a science museum for middle and high school students. Start the conversation by asking them which exhbit they are at.";
-    const chatCompletion = await client.chat.completions.create({
-        messages: [{ role: "system", content: initialMessage }],
-        model: "gpt-3.5-turbo",
-        // model: "gpt-4o",
-    });
+    const initialMessage = "As Richard Feynman, the famous physicist, you are currently guiding a tour at a science museum for middle and high school students. Start the conversation by asking them which exhibit they are at.";
+    try {
+        const chatCompletion = await client.chat.completions.create({
+            messages: [{ role: "system", content: initialMessage }],
+            model: "gpt-3.5-turbo",
+        });
 
-    // Store the initial context in the data
-    const conversationData = loadConversationData();
-    conversationData[sessionId] = [{ role: "system", content: initialMessage }];
-    saveConversationData(conversationData);
+        // Store the initial context in the data
+        const conversationData = loadConversationData();
+        conversationData[sessionId] = [{ role: "system", content: initialMessage }];
+        saveConversationData(conversationData);
 
-    return chatCompletion;
+        return chatCompletion;
+    } catch (error) {
+        console.error('Error sending initial message:', error);
+        throw error; // Propagate the error to handle it in the calling function
+    }
 }
 
 // Define your routes here
@@ -107,19 +113,18 @@ app.post('/api/assistant/thread/message', async (req, res) => {
         const chatCompletion = await client.chat.completions.create({
             messages: conversationData[sessionId],
             model: "gpt-3.5-turbo",
-            // model: "gpt-4o",
         });
 
         // Append assistant's response to the context
         const assistantMessage = chatCompletion.choices[0].message;
-        conversationData[sessionId].push(assistantMessage);
+        conversationData[sessionId].push({ role: "assistant", content: assistantMessage });
 
         // Save conversation data
         saveConversationData(conversationData);
 
         res.json({ choices: [{ message: assistantMessage }] });
     } catch (error) {
-        console.error(error);
+        console.error('Error handling message:', error);
         res.status(500).json({ error: 'Failed to send message.' });
     }
 });
