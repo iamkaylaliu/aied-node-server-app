@@ -12,12 +12,15 @@ dotenv.config();
 const app = express();
 
 // Use CORS middleware
-app.use(cors({
-    credentials: true,
-    origin: 'https://unveilgenius.netlify.app',
-}));
+// app.use(cors());
+app.use(
+    cors({
+        credentials: true,
+        // origin: process.env.FRONTEND_URL
+        origin: 'https://unveilgenius.netlify.app',
+    })
+);
 
-// Session setup
 const sessionOptions = {
     secret: "any string",
     resave: false,
@@ -40,64 +43,56 @@ const client = new OpenAI({
     apiKey: process.env.OPENAI_API_KEY,
 });
 
+// In-memory store for conversation contexts
+const conversationContexts = {};
+
 // Function to send an initial message to the OpenAI API
-async function sendInitialMessage(req) {
-    const initialMessage = "As Richard Feynman, the famous physicist, you are currently guiding a tour at a science museum for middle and high school students.";
+async function sendInitialMessage(threadId) {
     try {
+        const initialMessage = "As Richard Feynman, the famous physicist, you are currently guiding a tour at a science museum for middle and high school students. Start the conversation by asking them which exhbit they are at.";
         const chatCompletion = await client.chat.completions.create({
             messages: [{ role: "system", content: initialMessage }],
             model: "gpt-3.5-turbo",
+            // model: "gpt-4o",
         });
 
-        // Store the initial context in the session
-        req.session.conversationContext = [{ role: "system", content: initialMessage }];
-        req.session.conversationContext.push({
-            role: "assistant",
-            content: "Hello! Which exhibit would you like to start with?",
-        });
+        // Store the initial context in memory
+        conversationContexts[threadId] = [{ role: "system", content: initialMessage }];
 
-        return chatCompletion;
+        console.log('Initial message sent to OpenAI:', chatCompletion);
     } catch (error) {
         console.error('Error sending initial message:', error);
-        throw error; // Propagate the error to handle it in the calling function
     }
 }
 
 // Define your routes here
 app.post('/api/assistant/thread/message', async (req, res) => {
     try {
-        const { content } = req.body;
-        const sessionId = req.sessionID;
-        console.log(`Received message for session ${sessionId}: ${content}`);
+        const { thread_id, content } = req.body;
+        console.log(`Received message for thread ${thread_id}: ${content}`);
 
-        // Initialize or retrieve conversation context
-        let conversationContext = req.session.conversationContext || [];
-
-        // Check if the conversation context is empty and send initial message
-        if (conversationContext.length === 0) {
-            await sendInitialMessage(req);
-            conversationContext = req.session.conversationContext;
+        // Initialize conversation if it doesn't exist
+        if (!conversationContexts[thread_id]) {
+            await sendInitialMessage(thread_id);
         }
 
         // Append user message to the context
-        conversationContext.push({ role: "user", content });
+        conversationContexts[thread_id].push({ role: "user", content });
 
         // Send the message using OpenAI's chat.completions.create method
         const chatCompletion = await client.chat.completions.create({
-            messages: conversationContext,
+            messages: conversationContexts[thread_id],
             model: "gpt-3.5-turbo",
+            // model: "gpt-4o",
         });
 
         // Append assistant's response to the context
         const assistantMessage = chatCompletion.choices[0].message;
-        conversationContext.push({ role: "assistant", content: assistantMessage.content });
-
-        // Store updated context back in session
-        req.session.conversationContext = conversationContext;
+        conversationContexts[thread_id].push(assistantMessage);
 
         res.json({ choices: [{ message: assistantMessage }] });
     } catch (error) {
-        console.error('Error handling message:', error);
+        console.error(error);
         res.status(500).json({ error: 'Failed to send message.' });
     }
 });
