@@ -52,6 +52,7 @@ async function sendInitialMessage(threadId, exhibit) {
         const chatCompletion = await client.chat.completions.create({
             messages: [{ role: "system", content: initialMessage }],
             model: "gpt-3.5-turbo",
+            // model: "gpt-4o",
         });
 
         // Store the initial context in memory
@@ -81,6 +82,7 @@ app.post('/api/assistant/thread/message', async (req, res) => {
         const chatCompletion = await client.chat.completions.create({
             messages: conversationContexts[thread_id],
             model: "gpt-3.5-turbo",
+            // model: "gpt-4o",
         });
 
         // Append assistant's response to the context
