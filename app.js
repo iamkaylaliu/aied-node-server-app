@@ -51,8 +51,8 @@ async function sendInitialMessage(threadId, exhibit) {
         const initialMessage = `As Richard Feynman, the famous physicist, you are currently guiding a tour at the ${exhibit} exhibit in a science museum for middle and high school students.`;
         const chatCompletion = await client.chat.completions.create({
             messages: [{ role: "system", content: initialMessage }],
-            model: "gpt-3.5-turbo",
-            // model: "gpt-4o",
+            // model: "gpt-3.5-turbo",
+            model: "gpt-4o-mini",
         });
 
         // Store the initial context in memory
@@ -81,8 +81,8 @@ app.post('/api/assistant/thread/message', async (req, res) => {
         // Send the message using OpenAI's chat.completions.create method
         const chatCompletion = await client.chat.completions.create({
             messages: conversationContexts[thread_id],
-            model: "gpt-3.5-turbo",
-            // model: "gpt-4o",
+            // model: "gpt-3.5-turbo",
+            model: "gpt-4o-mini",
         });
 
         // Append assistant's response to the context
