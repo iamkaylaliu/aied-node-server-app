@@ -4,12 +4,24 @@ import 'dotenv/config';
 import OpenAI from 'openai';
 import dotenv from 'dotenv';
 import session from "express-session";
+import helmet from 'helmet';
 
 // Load environment variables from .env file
 dotenv.config();
 
 // Initialize Express app
 const app = express();
+
+// Use Helmet for setting security-related HTTP headers
+app.use(helmet({
+    contentSecurityPolicy: {
+        useDefaults: true,
+        directives: {
+            "frame-ancestors": ["'self'", "https://unveilgenius.netlify.app"],
+            // other directives as needed
+        },
+    },
+}));
 
 // Use CORS middleware
 app.use(
